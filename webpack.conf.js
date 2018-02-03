@@ -1,5 +1,4 @@
 import webpack from "webpack";
-import path from "path";
 
 export default {
   module: {
@@ -23,16 +22,5 @@ export default {
       "fetch": "imports?this=>global!exports?global.fetch!whatwg-fetch"
     })
   ],
-
-  context: path.join(__dirname, "src"),
-  entry: {
-    app: ["./js/app"],
-    cms: ["./js/cms"]
-  },
-  output: {
-    path: path.join(__dirname, "dist"),
-    publicPath: "/",
-    filename: "[name].js"
-  },
   externals:  [/^vendor\/.+\.js$/]
 };
