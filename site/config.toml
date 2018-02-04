@@ -3,6 +3,12 @@ languageCode = "en-us"
 title = "One (or) more thing(s)"
 theme = "hemingway"
 
+[params]
+    subtitle = "Little things in the cloud"
+
 [[params.social]]
 url = "/index.xml"
 fa_icon = "fa-rss"
+
+[permalinks]
+  post = "/t/:year/:month/:day/:title/"
