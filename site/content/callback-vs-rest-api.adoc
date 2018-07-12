@@ -1,0 +1,164 @@
++++
+date = "2017-04-18T21:37:38+02:00"
+draft = true
+title = "Callback vs REST API"
+author = "Joël Vimenet"
+series = "Receiving Sigfox messages"
++++
+People creating application using Sigfox network are often asking how to get
+messages sent by their devices on the cloud. This post is the first of a
+series that is gonna dive into the Sigfox reception chain and will present the
+different ways to get your messages, and the different options you have
+according your business needs.
+This first post is gonna present the difference between the Callback API (also
+known as Webhook API) and the much more traditional REST API.
+
+NOTE: This post is not a tutorial on how to use one or other API. It will focus
+on WHY using one or the other. A prerequisite to fully understand the post is
+to be able to develop a simple server application to receive an HTTP request,
+and to call a REST API.
+
+== Sigfox reception chain
+
+There are 4 elements involved in the full Sigfox chain:
+
+* The device
+* The Sigfox Basestation
+* The Sigfox cloud
+* Your server/cloud
+
+The device sends a message that is received by one or more base station(s).
+Each base station sends the received message to the Sigfox cloud. The Sigfox
+Cloud gets the message, checks the device identity and that this device is
+allowed to communicate on the network before registering the message.
+
+Once the message is registered, how do you get it on your application?
+
+== One message + two APIs = three possibilities
+
+This is the time of the choice : Should you use the REST API or the callback API
+to get your messages? When we're asked the question, our answer is invariably
+the same :
+
+> Use the Callback API!
+
+There are many reasons we provide this answer both technical and functional. I
+am gonna try to explain the difference between the two APIs and why it is
+smarter to use the first one.
+
+== Push vs Pull
+
+If you've been developping server applications for long enough (in internet time,
+it means more or less one week), you're probably aware of the difference between
+push and pull model, but let me summarize:
+
+* in pull model, you (the client) ask the server for a resource,
+* in push model, the server sends the resource as soon as it is available
+without explicit request from the client.
+
+Traditionnally, the web is based on the pull model: a client (the browser) sends
+a request to a server that responds with the designated resource (an html page,
+a CSS stylesheet, a javascript file...).
+
+However, on today's internet, you use applications based on push model everyday:
+
+* your smartphone notifications,
+* your twitter timeline,
+* slack, whatsapp, facebook messenger, jabber and every chat application is
+based on push model...
+
+Applied to the Internet of Things, and especially to the Sigfox technology, what
+are the advantages of the push model?
+
+There are two main advantages of push vs pull in IoT:
+
+* latency
+* resource consumption
+
+=== Latency
+
+According to the excellent
+https://en.wikipedia.org/wiki/Latency_%28engineering%29[Wikipedia],
+
+> [Latency is] a time delay between the cause and the effect of some physical change
+in the system being observed
+
+In our case, the cause is the message transmission by a device, and the
+effect is the message reception by your application.
+
+As it was previously said, in push model, the server sends the resource as soon
+as it is available. In the Sigfox environment, it means that the Sigfox Cloud
+sends a callback as soon as it receives the first repetition from the station
+with the lower latency (network latency between the station and the Sigfox cloud
+can have a great impact on this latency). Generally, it is between a few
+milliseconds and 10 seconds (in some rare bad cases).
+
+What happens when you use a pull API? As the data is given in response of a
+request, you have to _poll_ regularly the server. Depending on how lucky you are,
+the latency is between *0* and *your polling period*. To reduce the latency, you
+can be tempted to reduce the polling period. But what is the impact of this
+choice on the resource consumption?
+
+=== Resource consumption
+
+The latency mathematical expectation is *polling period/2*. It means that if
+you poll the REST API every minute, on a long period, your average latency
+would be 30s. To get the same latency as with callbacks, the polling period
+should be around __one second__.
+
+What's wrong with that? Imagine you have a
+chatty Sigfox device. It's gonna send a message at most every 10 minutes. It
+means that you're gonna send *600 requests* to get *one new message*. But the
+API does not returns you only the messages received since the last request. You
+can query with a timestamp,
+
+> Give me all the messages since time T
+
+but this is the timestamp of the message on the Sigfox network (when it's
+received by the base station). As we've seen previously, taking into account
+the network latency between the base station and the cloud, it can be older
+than one second. So you should take a margin on the period you query. This
+margin means that you will receive the same message multiple times. You will
+then have to code some logic to check whether the message is new or not.
+
+Conclusion : most of the time you will receive messages that are *already* in
+your database leading to useless processing and so useless ressource consumption.
+
+If you use push model, the Sigfox cloud will send (by default) one callback per
+message (when the Sigfox cloud receives from the first station). If you need
+details about how each station received the message, you can check *duplicates* on
+the configuration page, it will send *one callback per station*. Before
+activating duplicates, ensure that your server is able to handle the load
+generated (it can be huge). On the other side, if you have a high number of
+chatty devices and the latency is not extremely important, you can opt for the
+*batch mode*. It will send *at most one callback per second*, grouping all the
+messages received during the subsequent second. As every time, it is a tradeof
+between the latency and the resource consumption : number of callback is limited,
+ but latency is a bit higher.
+
+== Conclusion
+
+So if you want to receive Sigfox messages,
+
+. Choose the callback/webhook/push API, it is the optimal solution in terms of
+latency and resource consumption
+. Choose the options depending on your needs:
+* Default suits for most of the cases,
+* Activate duplicates if you have a small number of devices OR if you are
+confident enough in the capacity to potentially handle a high load,
+* Activate batch mode if you have a huge number of devices, and if low resource
+consumption is more important than low latency.
+
+== One more thing
+
+This is theory. The cloud sends callback to your server, you receive your
+devices messages, everything went fine.
+
+In practice, everything that can fail is eventualy going to fail. Let them fail.
+
+> Be prepared.
+
+image::/images/be_prepared.jpg[]
+
+In the next post, we are going to see some simple ways to handle a hardware or
+software failure, or even a basic software update.
